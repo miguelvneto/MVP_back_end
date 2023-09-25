@@ -2,10 +2,18 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_swagger_ui import get_swaggerui_blueprint
 from flask_swagger import swagger
-import psycopg2
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mvp.db'
+db = SQLAlchemy(app)
 CORS(app)
+
+class MinhaTabela(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    data = db.Column(db.String(10))
+    atividade = db.Column(db.String(255))
+    autor = db.Column(db.String(100))
 
 # Configuração do Swagger
 swagger_url = '/swagger'
@@ -19,51 +27,32 @@ atividades = []
 
 nome_tabela = "registro_manutencao"
 
-def cursor_DB():
-    # Conexão com o banco de dados
-    conn = psycopg2.connect(
-        dbname="servicelog",
-        user="postgres",
-        password="123",
-        host="localhost"
-    )
-    cur = conn.cursor()
-    
-    return conn, cur
+# def cursor_DB():
+#     # Conexão com o banco de dados SQLite
+#     conn = sqlite3.connect('mvp.db')
+#     cur = conn.cursor()
+#     return conn, cur
 
 # Define a rota para cadastro de atividade
 @app.route('/cadastrar_atividade', methods=['POST'])
 def cadastrar_atividade():
-    """Cadastra uma nova atividade"""
     json = request.get_json()
 
     # Verifica se todos os parâmetros obrigatórios foram enviados
     data = json.get("data")
     atividade = json.get("atividade")
     autor = json.get("autor")
-    
+
     if data is None or atividade is None or autor is None:
         return 'Os campos "data", "atividade" e "autor" devem ser preenchidos.'
-    
-    # Conecta DB e cria um cursor
-    conn, cur = cursor_DB()
-    
-    # Define os valores para a nova linha
-    data = json["data"]
-    atividade = json["atividade"]
-    autor = json["autor"]
 
-    # Inserção na tabela
-    cur.execute('INSERT INTO '+nome_tabela+' (data, atividade, autor) VALUES (%s, %s, %s)', (data, atividade, autor))
-
-    # Confirma as alterações no banco de dados
-    conn.commit()
-
-    # Fecha o cursor e a conexão com o banco de dados
-    cur.close()
-    conn.close()
+    # Cria um novo registro no banco de dados usando o modelo
+    nova_atividade = MinhaTabela(data=data, atividade=atividade, autor=autor)
+    db.session.add(nova_atividade)
+    db.session.commit()
 
     return jsonify()
+
 
 # Define a rota para listar atividade
 @app.route('/listar_atividade', methods=['GET'])
@@ -194,4 +183,5 @@ def create_swagger_spec():
     return jsonify(swag)
 
 if __name__ == '__main__':
+    db.create_all()
     app.run()

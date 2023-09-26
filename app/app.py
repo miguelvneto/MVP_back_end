@@ -3,15 +3,16 @@ from flask_cors import CORS
 from flask_swagger_ui import get_swaggerui_blueprint
 from flask_swagger import swagger
 from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mvp.db'
 db = SQLAlchemy(app)
 CORS(app)
 
-class MinhaTabela(db.Model):
+class Atividade(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    data = db.Column(db.String(10))
+    data = db.Column(db.Date)
     atividade = db.Column(db.String(255))
     autor = db.Column(db.String(100))
 
@@ -27,14 +28,9 @@ atividades = []
 
 nome_tabela = "registro_manutencao"
 
-# def cursor_DB():
-#     # Conexão com o banco de dados SQLite
-#     conn = sqlite3.connect('mvp.db')
-#     cur = conn.cursor()
-#     return conn, cur
-
 # Define a rota para cadastro de atividade
 @app.route('/cadastrar_atividade', methods=['POST'])
+
 def cadastrar_atividade():
     json = request.get_json()
 
@@ -46,42 +42,29 @@ def cadastrar_atividade():
     if data is None or atividade is None or autor is None:
         return 'Os campos "data", "atividade" e "autor" devem ser preenchidos.'
 
+    data_obj = datetime.strptime(data, "%Y-%m-%d").date()
+
     # Cria um novo registro no banco de dados usando o modelo
-    nova_atividade = MinhaTabela(data=data, atividade=atividade, autor=autor)
+    nova_atividade = Atividade(data=data_obj, atividade=atividade, autor=autor)
     db.session.add(nova_atividade)
     db.session.commit()
 
-    return jsonify()
-
+    return jsonify({'message': 'Atividade cadastrada com sucesso'})
 
 # Define a rota para listar atividade
 @app.route('/listar_atividade', methods=['GET'])
 def listar_atividade():
     """Lista as atividades"""
-    # Conecta DB e cria um cursor
-    conn, cur = cursor_DB()
-
-    # Define o número de linhas que você deseja recuperar
-    x = 10
-
-    # Executa a consulta SQL para obter as últimas x linhas da tabela
-    query = f'SELECT * FROM "'+nome_tabela+f'" ORDER BY id DESC LIMIT {x};'
-    cur.execute(query)
-
-    # Obtém os resultados da consulta
-    rows = cur.fetchall()
-
-    # Fecha o cursor e a conexão com o banco de dados
-    cur.close()
-    conn.close()
+    # Consulta os últimos 10 registros da tabela Atividade
+    atividades = Atividade.query.order_by(Atividade.id.desc()).limit(10).all()
 
     lista = []
-    for atv in rows:
+    for atv in atividades:
         lista.append({
-            "id": atv[0],
-            "data": atv[1].strftime("%Y/%m/%d"),
-            "atividade": atv[2],
-            "autor": atv[3]
+            "id": atv.id,
+            "data": atv.data.strftime("%Y/%m/%d"),
+            "atividade": atv.atividade,
+            "autor": atv.autor
         })
     return {'atividades': lista}
 
@@ -94,39 +77,49 @@ def retorna_atividade(atv):
     }
 
 # Define a rota para deletar atividade
-@app.route('/deletar_atividade/<string:atividade>', methods=['DELETE'])
-def deletar_atividade(atividade):
-    """Deleta uma atividade pelo ID"""
-    print(atividade)
-    
+@app.route('/deletar_atividade/<string:atividade_id>', methods=['DELETE'])
+def deletar_atividade(atividade_id):
+    # Busca a atividade pelo ID
+    atividade = Atividade.query.get(atividade_id)
+
     if atividade is None:
         return jsonify({'error': 'Atividade não encontrada.'}), 404
-    
-    # Conecta DB e cria um cursor
-    conn, cur = cursor_DB()
 
-    query = f'SELECT * FROM "'+nome_tabela+f'" where "id" = {atividade};'     
-    cur.execute(query)
-    conn.commit() 
+    # Remove a atividade do banco de dados
+    db.session.delete(atividade)
+    db.session.commit()
 
-    # Obtém os resultados da consulta
-    if len(cur.fetchall()) == 0:
+    return jsonify({'message': 'Atividade removida com sucesso!'})
 
-        # Fecha o cursor e a conexão com o banco de dados
-        cur.close()
-        conn.close()
+# Define a rota para atualizar uma atividade pelo ID
+@app.route('/atualizar_atividade/<int:atividade_id>', methods=['PUT'])
+def atualizar_atividade(atividade_id):
+    # Busca a atividade pelo ID
+    atividade = Atividade.query.get(atividade_id)
 
-        return jsonify({'message': 'Atividade Inexistente!'})
+    if atividade is None:
+        return jsonify({'error': 'Atividade não encontrada.'}), 404
 
-    query = f'DELETE FROM "'+nome_tabela+f'" where "id" = {atividade};'
-    cur.execute(query)
-    conn.commit() 
+    # Obtém os dados do JSON da solicitação
+    json = request.get_json()
+    data = json.get("data")
+    atividade_texto = json.get("atividade")
+    autor = json.get("autor")
 
-    # Fecha o cursor e a conexão com o banco de dados
-    cur.close()
-    conn.close()
+    if data is None or atividade_texto is None or autor is None:
+        return 'Os campos "data", "atividade" e "autor" devem ser preenchidos.', 400
 
-    return jsonify({'message': 'Atividade removida com sucesso!'}) 
+    data_obj = datetime.strptime(data, "%Y-%m-%d").date()
+
+    # Atualiza os dados da atividade
+    atividade.data = data_obj
+    atividade.atividade = atividade_texto
+    atividade.autor = autor
+
+    # Commit das alterações no banco de dados
+    db.session.commit()
+
+    return jsonify({'message': 'Atividade atualizada com sucesso!'})
 
 @app.route('/api/docs/swagger.json', methods=['GET'])
 def create_swagger_spec():

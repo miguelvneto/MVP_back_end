@@ -4,6 +4,7 @@ from flask_swagger_ui import get_swaggerui_blueprint
 from flask_swagger import swagger
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from googletrans import Translator
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mvp.db'
@@ -50,6 +51,22 @@ def cadastrar_atividade():
     db.session.commit()
 
     return jsonify({'message': 'Atividade cadastrada com sucesso'})
+
+# Define a rota para duplicar uma atividade pelo ID
+@app.route('/duplicar_atividade/<int:atividade_id>', methods=['POST'])
+def duplicar_atividade(atividade_id):
+    # Busca a atividade pelo ID
+    atividade_original = Atividade.query.get(atividade_id)
+
+    if atividade_original is None:
+        return jsonify({'error': 'Atividade não encontrada.'}), 404
+
+    # Cria uma cópia da atividade original, mantendo a mesma data, atividade e autor
+    nova_atividade = Atividade(data=atividade_original.data, atividade=atividade_original.atividade, autor=atividade_original.autor)
+    db.session.add(nova_atividade)
+    db.session.commit()
+
+    return jsonify({'message': 'Atividade duplicada com sucesso!'})
 
 # Define a rota para listar atividade
 @app.route('/listar_atividade', methods=['GET'])
@@ -118,8 +135,28 @@ def atualizar_atividade(atividade_id):
 
     # Commit das alterações no banco de dados
     db.session.commit()
-
+ 
     return jsonify({'message': 'Atividade atualizada com sucesso!'})
+
+# Cria uma instância do tradutor do Google
+translator = Translator()
+
+# Define a rota para traduzir um texto
+@app.route('/traduzir_texto', methods=['POST'])
+def traduzir_texto():
+    json = request.get_json()
+
+    # Verifica se o parâmetro 'texto' foi enviado
+    texto = json.get("texto")
+
+    if texto is None:
+        return 'O campo "texto" deve ser preenchido.'
+
+    # Traduz o texto para um idioma de destino (por exemplo, inglês)
+    destino = 'en'  # Altere o idioma de destino conforme necessário
+    texto_traduzido = translator.translate(texto, dest=destino).text
+
+    return jsonify({'texto_traduzido': texto_traduzido})
 
 @app.route('/api/docs/swagger.json', methods=['GET'])
 def create_swagger_spec():

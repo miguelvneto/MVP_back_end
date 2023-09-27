@@ -4,7 +4,6 @@ from flask_swagger_ui import get_swaggerui_blueprint
 from flask_swagger import swagger
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-from googletrans import Translator
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mvp.db'
@@ -138,26 +137,6 @@ def atualizar_atividade(atividade_id):
  
     return jsonify({'message': 'Atividade atualizada com sucesso!'})
 
-# Cria uma instância do tradutor do Google
-translator = Translator()
-
-# Define a rota para traduzir um texto
-@app.route('/traduzir_texto', methods=['POST'])
-def traduzir_texto():
-    json = request.get_json()
-
-    # Verifica se o parâmetro 'texto' foi enviado
-    texto = json.get("texto")
-
-    if texto is None:
-        return 'O campo "texto" deve ser preenchido.'
-
-    # Traduz o texto para um idioma de destino (por exemplo, inglês)
-    destino = 'en'  # Altere o idioma de destino conforme necessário
-    texto_traduzido = translator.translate(texto, dest=destino).text
-
-    return jsonify({'texto_traduzido': texto_traduzido})
-
 @app.route('/api/docs/swagger.json', methods=['GET'])
 def create_swagger_spec():
     """Gera a especificação do Swagger"""
@@ -165,12 +144,62 @@ def create_swagger_spec():
     swag['info']['version'] = '1.0.0'
     swag['info']['title'] = 'API de Atividades'
     swag['paths'] = {
-        '/cadastrar_atividade': {
+         '/cadastrar_atividade': {
             'post': {
                 'summary': 'Cadastra uma nova atividade',
+                'parameters': [
+                    {
+                        'in': 'body',
+                        'name': 'body',
+                        'description': 'Parâmetros da atividade',
+                        'required': True,
+                        'schema': {
+                            'type': 'object',
+                            'properties': {
+                                'autor': {
+                                    'type': 'string',
+                                    'description': 'Nome do autor da atividade'
+                                },
+                                'atividade': {
+                                    'type': 'string',
+                                    'description': 'Descrição da atividade'
+                                },
+                                'data': {
+                                    'type': 'string',
+                                    'format': 'date',
+                                    'description': 'Data da atividade (formato: YYYY-MM-DD)'
+                                }
+                            }
+                        }
+                    }
+                ],
                 'responses': {
                     '200': {
                         'description': 'Atividade cadastrada com sucesso'
+                    }
+                }
+            }
+        },
+        '/duplicar_atividade/{atividade_id}': {  # Rota duplicar_atividade
+            'post': {
+                'summary': 'Duplica uma atividade pelo ID',
+                'parameters': [
+                    {
+                        'name': 'atividade_id',
+                        'in': 'path',
+                        'description': 'ID da atividade a ser duplicada',
+                        'required': True,
+                        'schema': {
+                            'type': 'integer'
+                        }
+                    }
+                ],
+                'responses': {
+                    '200': {
+                        'description': 'Atividade duplicada com sucesso'
+                    },
+                    '404': {
+                        'description': 'Atividade não encontrada'
                     }
                 }
             }
@@ -185,12 +214,12 @@ def create_swagger_spec():
                 }
             }
         },
-        '/deletar_atividade/{atividade}': {
+        '/deletar_atividade/{atividade_id}': {
             'delete': {
                 'summary': 'Deleta uma atividade pelo ID',
                 'parameters': [
                     {
-                        'name': 'atividade',
+                        'name': 'atividade_id',
                         'in': 'path',
                         'description': 'ID da atividade a ser deletada',
                         'required': True,
@@ -202,6 +231,54 @@ def create_swagger_spec():
                 'responses': {
                     '200': {
                         'description': 'Atividade removida com sucesso'
+                    },
+                    '404': {
+                        'description': 'Atividade não encontrada'
+                    }
+                }
+            }
+        },
+        '/atualizar_atividade/{atividade_id}': {  # Rota atualizar_atividade
+            'put': {
+                'summary': 'Atualiza uma atividade pelo ID',
+                'parameters': [
+                     {
+                        'name': 'atividade_id',
+                        'in': 'path',
+                        'description': 'ID da atividade a ser atualizada',
+                        'required': True,
+                        'schema': {
+                            'type': 'integer'
+                        }
+                    },
+                    {
+                        'in': 'body',
+                        'name': 'body',
+                        'description': 'Parâmetros da atividade',
+                        'required': True,
+                        'schema': {
+                            'type': 'object',
+                            'properties': {
+                                'autor': {
+                                    'type': 'string',
+                                    'description': 'Nome do autor da atividade'
+                                },
+                                'atividade': {
+                                    'type': 'string',
+                                    'description': 'Descrição da atividade'
+                                },
+                                'data': {
+                                    'type': 'string',
+                                    'format': 'date',
+                                    'description': 'Data da atividade (formato: YYYY-MM-DD)'
+                                }
+                            }
+                        }
+                    }
+                ],
+                'responses': {
+                    '200': {
+                        'description': 'Atividade atualizada com sucesso'
                     },
                     '404': {
                         'description': 'Atividade não encontrada'

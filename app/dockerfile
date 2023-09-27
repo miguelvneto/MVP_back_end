@@ -2,7 +2,7 @@
 FROM python:3.11.4
 
 # Defina o diretório de trabalho no contêiner
-WORKDIR /app
+WORKDIR /
 
 # Copie os requisitos do projeto para o contêiner
 COPY requirements.txt .
@@ -17,4 +17,4 @@ COPY . .
 EXPOSE 5000
 
 # Inicialize a aplicação Flask quando o contêiner for iniciado
-CMD ["python", "app.py"]
+CMD ["flask", "run", "--host", "0.0.0.0", "--port", "5000"]
